@@ -1,0 +1,1470 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+%matplotlib inline
+
+#loading all the data
+df = pd.read_csv('used_device_data.csv')
+df
+
+# Data Analysis
+
+#number of rows and columns
+df.shape
+
+#identifying the columns and their names
+df.columns
+
+duplicated_rows= df[df.duplicated()]
+duplicated_rows.shape
+
+# a statistical summary 
+df.describe()
+
+# checking data types and null values for the columns
+df.info()
+
+df.nunique()
+
+#finding if there are any categorical features
+categorical_features=[feature for feature in df.columns if df[feature].dtype == 'O']
+categorical_features
+
+# describing the categorical features
+categorical_features = ['device_brand','os','4g','5g']
+for i in categorical_features:
+    print("Describing {} feature:".format(i))
+    print(df[i].value_counts()*100/3454)
+    print('*'*50)
+
+#checking for missing values
+print('The missing values are: ')
+df.isnull().sum()
+
+#checking if we have outliers in the features, we got missing values
+features=['rear_camera_mp','front_camera_mp','internal_memory','ram','battery','weight']
+
+for i in features:
+    sns.boxplot(x=df[i])
+    plt.show()
+
+# Data Visualisation
+
+fig,axs= plt.subplots(5,3,figsize=(25, 25))
+
+axs = axs.ravel()
+
+for i, feature in enumerate(df.columns):
+    
+    # A histogram of the feature in the current subplot
+    axs[i].hist(df[feature])
+    axs[i].set_title(feature)
+
+# Show the plot
+plt.show()
+
+# Calculate the value counts for the 'device_brand' column
+value_counts = df['device_brand'].value_counts()
+
+# Define a list of colors for the bars
+colors = ['purple']
+
+plt.figure(figsize=(15,10))
+plt.bar(value_counts.index, value_counts, color=colors)
+
+plt.xlabel('Device Brand')
+plt.title('Device Brand Distribution')
+plt.ylabel('Number of Device Brands')
+
+# Rotate x-axis labels for better readability
+plt.xticks(rotation=110)
+
+# Show the bar graph
+plt.show()
+
+def pie_cat(feature):
+    order = df[feature].value_counts(ascending=False).index
+    plt.figure(figsize=(20,9))
+    graph = sns.countplot(data=df, x=feature, order=order, palette='colorblind')
+    for p in graph.patches:
+        percentage = str((100*p.get_height()/len(df[feature])).round(2)) + "%"
+        x = p.get_x() + p.get_width()/2
+        y = p.get_y() + p.get_height()
+        plt.annotate(percentage, (x,y), ha='center')
+    plt.title('{}'.format(feature.upper()))
+    plt.show()
+    procent_frame = pd.DataFrame(df[feature].value_counts())
+    procent_frame['%'] = procent_frame[feature]*100/len(df[feature])
+    print(procent_frame)
+
+for i in categorical_features:
+    pie_cat(i)
+
+# Data Preprocessing 
+
+#handling missing values
+for i in features:
+    
+    #calculate median
+    a=df[i].median()
+    
+    #print feature and the median value
+    print(i,' median value : ', a)
+    
+    # filling in missing values in the current features with the median
+    df[i]= df[i].fillna(a)
+
+#display the values after handing missing values
+df.isnull().sum()
+
+#handling Numerical features
+#num_features =['rear_camera_mp','front_camera_mp','internal_memory','ram','battery','weight','screen size','release_year','days_used','normalised_used_price','normalised_new_price']
+fig,axs= plt.subplots(4,3,figsize=(15, 15))
+# Flatten the 2D array of subplots to make them easier to access
+axs = axs.ravel()
+num_features =['rear_camera_mp','front_camera_mp','internal_memory','ram','battery','weight','screen_size','release_year','days_used','normalized_used_price','normalized_new_price']
+for i, feature in enumerate(num_features):
+    
+    axs[i].boxplot(df[feature])
+    axs[i].set_title(feature)
+
+# method used to remove an axis from a figure; here removing last grid--> 12th grid since we only have 11 numerical features
+fig.delaxes(axs[-1])
+# Adjust the spacing between subplots
+plt.tight_layout()
+# Show the plot
+plt.show()
+
+
+
+features = ['screen_size', 'front_camera_mp', 'ram', 'battery', 'weight', 'normalized_used_price', 'normalized_new_price']
+
+for i in features:
+    lower = df[i].quantile(0.10)
+    upper = df[i].quantile(0.90)
+    df[i] = df[i].clip(lower=lower, upper=upper)
+    print('Feature: ', i)
+    print('Skewness value: ', df[i].skew())
+    print('\n')
+
+
+plt.figure(figsize=(15, 15))
+
+# Create a grid of box plots
+for i, feature in enumerate(num_features):
+    plt.subplot(4, 3, i+1)
+    sns.boxplot(x=df[feature])
+    plt.title(feature)
+
+# Adjust the layout
+plt.tight_layout()
+
+# Show the plot
+plt.show()
+
+upper_percentiles = {
+    'rear_camera_mp': 0.95,
+    'internal_memory': 0.9,
+    'weight': 0.8
+}
+
+for column, percentile in upper_percentiles.items():
+    upper = df[column].quantile(percentile)
+    df[column] = df[column].clip(upper=upper)
+
+plt.figure(figsize=(15, 15))
+
+# Create a grid of box plots
+for i, feature in enumerate(num_features):
+    plt.subplot(4, 3, i+1)
+    sns.boxplot(x=df[feature])
+    plt.title(feature)
+
+# Adjust the layout
+plt.tight_layout()
+
+# Show the plot
+plt.show()
+
+df.shape
+
+# Scaling and Normalisation
+
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+
+# Assuming X and y are your features and target variable
+X = df.drop('normalized_used_price', axis=1)
+y = df['normalized_used_price']
+
+# Split the dataset into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+
+# Define categorical and numerical features
+categorical_features = X.select_dtypes(include=['object']).columns
+numerical_features = X.select_dtypes(exclude=['object']).columns
+
+# Create transformers for numerical and categorical features
+numerical_transformer = MinMaxScaler()
+categorical_transformer = OneHotEncoder(handle_unknown='ignore')
+
+# Combine transformers into a preprocessor
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', numerical_transformer, numerical_features),
+        ('cat', categorical_transformer, categorical_features)
+    ])
+
+
+from sklearn.preprocessing import MinMaxScaler
+
+def scale(X):
+    scaler = MinMaxScaler()
+    X = scaler.fit_transform(X)
+
+    return X
+
+# Exploratory Data Analysis
+
+#bivariate analysis - cheking relationships
+
+num=['screen_size',
+ 'rear_camera_mp',
+ 'front_camera_mp',
+ 'internal_memory',
+ 'ram',
+ 'battery',
+ 'weight',
+ 'release_year',
+ 'days_used',
+ 'normalized_new_price']
+
+fig,axs= plt.subplots(5,2,figsize=(12,12))
+axs=axs.ravel()
+for i,ax in enumerate(axs):
+
+    sns.regplot(x=num[i],y='normalized_used_price',data=df,ax=ax,color='black',scatter_kws={"color":"purple"})
+
+plt.tight_layout()
+plt.show()
+
+fig,axs= plt.subplots(2,2,figsize=(15,15))
+axs=axs.ravel()
+for i,ax in enumerate(axs):
+    sns.boxplot(x=categorical_features[i],y='normalized_used_price',data=df,ax=ax)
+
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(20, 10))
+correlation_matrix = df.corr()
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm')
+
+# Machine Learning Algorithms
+#to implement models
+
+
+#create a table
+pip install tabulate
+
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.svm import SVR
+from sklearn.neural_network import MLPRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+import time
+from tabulate import tabulate
+
+
+# Define models
+models = [
+    ("Linear Regression", LinearRegression()),
+    ("Decision Tree", DecisionTreeRegressor()),
+    ("Random Forest", RandomForestRegressor()),
+    ("Gradient Boosting", GradientBoostingRegressor()),
+    ("Support Vector Regression", SVR()),
+    ("MLP Regression", MLPRegressor())
+]
+
+# Collecting results for the table
+results_table = []
+
+# Evaluation of each model
+for model_name, model in models:
+    print(f"\nTraining and evaluating {model_name} model:")
+    
+    # Creation of a pipeline with the preprocessor and the model 
+    pipeline = Pipeline([
+        ('preprocessor', preprocessor),
+        ('model', model)
+    ])
+
+    # Time taken to train the model (unscaled)
+    start_time_unscaled = time.time()
+    pipeline.fit(X_train, y_train)
+    end_time_unscaled = time.time()
+    time_taken_unscaled = end_time_unscaled - start_time_unscaled
+
+    # Time taken to train the model (scaled)
+    start_time_scaled = time.time()
+    pipeline.fit(X_train, y_train)
+    end_time_scaled = time.time()
+    time_taken_scaled = end_time_scaled - start_time_scaled
+
+    # Display training time
+    print(f'Time taken to train (Unscaled): {time_taken_unscaled:.3f} seconds')
+    print(f'Time taken to train (Scaled): {time_taken_scaled:.3f} seconds')
+
+    # Evaluation of the model (unscaled)
+    train_score_unscaled = pipeline.score(X_train, y_train)
+    test_score_unscaled = pipeline.score(X_test, y_test)
+    y_pred_unscaled = pipeline.predict(X_test)
+    mse_unscaled = mean_squared_error(y_test, y_pred_unscaled)
+    r2_unscaled = r2_score(y_test, y_pred_unscaled)
+
+    results_table.append([model_name, "Without Scaling", train_score_unscaled, test_score_unscaled, mse_unscaled, r2_unscaled, time_taken_unscaled])
+
+    # Evaluation the model (scaled)
+    train_score_scaled = pipeline.score(X_train, y_train)
+    test_score_scaled = pipeline.score(X_test, y_test)
+    y_pred_scaled = pipeline.predict(X_test)
+    mse_scaled = mean_squared_error(y_test, y_pred_scaled)
+    r2_scaled = r2_score(y_test, y_pred_scaled)
+
+    results_table.append([model_name, "With MinMax Scaling", train_score_scaled, test_score_scaled, mse_scaled, r2_scaled, time_taken_scaled])
+
+# Display the results as a table
+headers = ["Model", "Data Scaling", "Training Score", "Test Score", "Mean Squared Error", "R-squared", "Time taken (s)"]
+print(tabulate(results_table, headers=headers, tablefmt="grid"))
+
+
+# Feature Engineering
+
+
+
+#This is so we can use features for evaluation and training
+
+#importing feature selection methods 
+from sklearn.feature_selection import SelectKBest
+from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import mutual_info_regression
+
+
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.svm import SVR
+from sklearn.neural_network import MLPRegressor
+
+#importing of metrics
+from sklearn.metrics import mean_squared_error, r2_score
+
+# creating a function for dataset split
+def dataset(X,y):
+    train_full_X, val_X, train_full_y, val_y = train_test_split(X, y,test_size=0.2,random_state = 0)
+
+# Use the same function above for the validation set
+    train_X, test_X, train_y, test_y = train_test_split(train_full_X, train_full_y, test_size=0.25,random_state = 0)
+    return (train_X, val_X, train_y, val_y)
+
+def PCAx(X):
+
+    #PCA model with the desired number of components
+    pca = PCA()
+
+    # Fitting the PCA model to the data
+    pca.fit(X)
+
+    # Transforming the data into the new feature space
+    X_pca = pca.transform(X)
+    return X_pca
+
+scores=[]
+
+#using top 5 features and perform decision tree regression
+
+
+X= df.drop('normalized_used_price',axis=1)
+y= df.normalized_used_price
+
+X=pd.get_dummies(X)
+
+k = 5 # number of top features to be selected
+top_k_features = SelectKBest(score_func=mutual_info_regression, k=k).fit(X, y)
+X_new = top_k_features.transform(X)
+
+X_new= scale(X_new)
+X= PCAx(X_new)
+X_train,X_val,y_train,y_val= dataset(X,y)
+
+decision_model= DecisionTreeRegressor(random_state=1)
+decision_model.fit(X_train, y_train)
+preds= decision_model.predict(X_val)
+
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+
+a= "Decision Tree Regression with top 5 features"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+
+scores.append((a,round(r2,4),round(MSE,4)))
+
+#using all features to perform decision tree regression
+X= df.drop('normalized_used_price',axis=1)
+y= df.normalized_used_price
+
+X=pd.get_dummies(X)
+
+
+X= scale(X)
+X= PCAx(X)
+
+X_train,X_val,y_train,y_val= dataset(X,y)
+
+decision_model1= DecisionTreeRegressor(random_state=1)
+decision_model1.fit(X_train, y_train)
+preds= decision_model1.predict(X_val)
+
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+
+a= "Decision Tree Regreesion with all features"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+
+scores.append((a,round(r2,4),round(MSE,4)))
+
+
+#using top 5 features and perform random forest regression
+from sklearn.ensemble import RandomForestRegressor
+
+
+X= df.drop('normalized_used_price',axis=1)
+y= df.normalized_used_price
+
+X=pd.get_dummies(X)
+
+k = 5 # number of top features to select
+top_k_features = SelectKBest(score_func=mutual_info_regression, k=k).fit(X, y)
+X_new = top_k_features.transform(X)
+
+X_new= scale(X_new)
+X= PCAx(X_new)
+X_train,X_val,y_train,y_val= dataset(X,y)
+
+random_model= RandomForestRegressor(random_state=1)
+random_model.fit(X_train, y_train)
+preds= random_model.predict(X_val)
+
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+
+a= "Random Forest Regression with top 5 features"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+
+scores.append((a,round(r2,4),round(MSE,4)))
+
+#using all features and perform random forest regression
+X= df.drop('normalized_used_price',axis=1)
+y= df.normalized_used_price
+
+X=pd.get_dummies(X)
+
+
+X= scale(X)
+X= PCAx(X)
+X_train,X_val,y_train,y_val= dataset(X,y)
+
+random_model1= RandomForestRegressor(random_state=1)
+random_model1.fit(X_train, y_train)
+preds= random_model1.predict(X_val)
+
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+
+a= "Random Forest Regression with all features"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+
+scores.append((a,round(r2,4),round(MSE,4)))
+
+#use top five features and perform linear regression
+from sklearn.linear_model import LinearRegression
+
+X= df.drop('normalized_used_price',axis=1)
+y= df.normalized_used_price
+
+X=pd.get_dummies(X)
+
+k = 5 # number of top features to select
+top_k_features = SelectKBest(score_func=mutual_info_regression, k=k).fit(X, y)
+X_new = top_k_features.transform(X)
+
+X_new= scale(X_new)
+X= PCAx(X_new)
+X_train,X_val,y_train,y_val= dataset(X,y)
+
+linear_model= LinearRegression()
+linear_model.fit(X_train, y_train)
+preds= linear_model.predict(X_val)
+
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+
+a= "Linear Regression with top 5 features"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+
+scores.append((a,round(r2,4),round(MSE,4)))
+
+#use all features to perform linear regression
+X= df.drop('normalized_used_price',axis=1)
+y= df.normalized_used_price
+
+X=pd.get_dummies(X)
+
+X= scale(X)
+X= PCAx(X)
+X_train,X_val,y_train,y_val= dataset(X,y)
+
+linear_model1= LinearRegression()
+linear_model1.fit(X_train, y_train)
+preds= linear_model1.predict(X_val)
+
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+
+a= "Linear Regression with all features"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+
+scores.append((a,round(r2,4),round(MSE,4)))
+
+#MLP Regression using 5 Features 
+X = df.drop('normalized_used_price', axis=1)
+y = df.normalized_used_price
+
+# One-hot encode categorical variables
+X = pd.get_dummies(X)
+
+# Feature selection using mutual information
+k = 5  # number of top features to select
+top_k_features = SelectKBest(score_func=mutual_info_regression, k=k).fit(X, y)
+X_selected = top_k_features.transform(X)
+
+# Scaling the features
+X_scaled = scale(X_selected)
+
+# Applying PCA
+pca = PCA(n_components=5) 
+X_pca = pca.fit_transform(X_scaled)
+
+# Split the dataset
+X_train, X_val, y_train, y_val = train_test_split(X_pca, y, test_size=0.2, random_state=1)
+
+# MLP Regression
+mlp_model = MLPRegressor(random_state=1)
+mlp_model.fit(X_train, y_train)
+
+# Predictions
+preds = mlp_model.predict(X_val)
+
+# Evaluation metrics
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+a= "MLP Regression with top 5 features:"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+
+scores.append((a,round(r2,4),round(MSE,4)))
+
+X = df.drop('normalized_used_price', axis=1)
+y = df.normalized_used_price
+
+# One-hot encode categorical variables
+X = pd.get_dummies(X)
+
+# Scaling the features
+X_scaled = scale(X)
+
+# Applying PCA
+pca = PCA(n_components=5)  
+X_pca = pca.fit_transform(X_scaled)
+
+# Split the dataset
+X_train, X_val, y_train, y_val = train_test_split(X_pca, y, test_size=0.2, random_state=1)
+
+# MLP Regression
+mlp_model = MLPRegressor(random_state=1)
+mlp_model.fit(X_train, y_train)
+
+# Predictions
+preds = mlp_model.predict(X_val)
+
+# Evaluation metrics
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+a= "MLP Regression with all features:"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+scores.append((a,round(r2,4),round(MSE,4)))
+
+X = df.drop('normalized_used_price', axis=1)
+y = df.normalized_used_price
+
+# One-hot encode categorical variables
+X = pd.get_dummies(X)
+
+# Feature selection using mutual information
+k = 5  # number of top features to select
+top_k_features = SelectKBest(score_func=mutual_info_regression, k=k).fit(X, y)
+X_selected = top_k_features.transform(X)
+
+# Scaling the features
+X_scaled = scale(X_selected)
+
+# Applying PCA
+pca = PCA(n_components=5) 
+X_pca = pca.fit_transform(X_scaled)
+
+# Split the dataset
+X_train, X_val, y_train, y_val = train_test_split(X_pca, y, test_size=0.2, random_state=1)
+
+# GradientBoostingRegressor
+gb_model = GradientBoostingRegressor(random_state=1)
+gb_model.fit(X_train, y_train)
+
+# Predictions
+preds = gb_model.predict(X_val)
+
+# Evaluation metrics
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+a= "GradientBoostingRegressor with 5 features:"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+
+scores.append((a,round(r2,4),round(MSE,4)))
+
+
+X = df.drop('normalized_used_price', axis=1)
+y = df.normalized_used_price
+
+# One-hot encode categorical variables
+X = pd.get_dummies(X)
+
+# Scaling the features
+X_scaled = scale(X)
+
+# Applying PCA
+pca = PCA(n_components=5)  
+X_pca = pca.fit_transform(X_scaled)
+
+# Split the dataset
+X_train, X_val, y_train, y_val = train_test_split(X_pca, y, test_size=0.2, random_state=1)
+
+# GradientBoostingRegressor
+gb_model = GradientBoostingRegressor(random_state=1)
+gb_model.fit(X_train, y_train)
+
+# Predictions
+preds = gb_model.predict(X_val)
+
+# Evaluation metrics
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+a= "GradientBoostingRegressor with all features:"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+
+scores.append((a,round(r2,4),round(MSE,4)))
+
+#use top 5 features to perform support vector regression
+
+
+X= df.drop('normalized_used_price',axis=1)
+y= df.normalized_used_price
+
+X=pd.get_dummies(X)
+
+k = 5 # number of top features to select
+top_k_features = SelectKBest(score_func=mutual_info_regression, k=k).fit(X, y)
+X_new = top_k_features.transform(X)
+
+X_new= scale(X_new)
+X= PCAx(X_new)
+X_train,X_val,y_train,y_val= dataset(X,y)
+
+svm_model= SVR(kernel='linear')
+svm_model.fit(X_train, y_train)
+preds= svm_model.predict(X_val)
+
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+
+a= "SVM Regression with top 5 features"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+
+scores.append((a,round(r2,4),round(MSE,4)))
+
+#Use all features and perform Support Vector Regression
+X= df.drop('normalized_used_price',axis=1)
+y= df.normalized_used_price
+
+X=pd.get_dummies(X)
+
+
+X= scale(X)
+X= PCAx(X)
+X_train,X_val,y_train,y_val= dataset(X,y)
+
+svm_model1= SVR(kernel='linear')
+svm_model1.fit(X_train, y_train)
+preds= svm_model1.predict(X_val)
+
+r2= r2_score(y_val,preds)
+MSE= mean_squared_error(y_val,preds)
+
+
+a= "SVM Regression with all features"
+print(a)
+print("R2: ",round(r2,4))
+print("MSE: ",round(MSE,4))
+
+scores.append((a,round(r2,4),round(MSE,4)))
+
+scores
+
+columns=['models','R2','MSE']
+score= pd.DataFrame(scores, columns=columns)
+score.head(12)
+
+# Tuning of Models
+
+best_model=[]
+
+#importing perfomance metrics
+from sklearn.model_selection import GridSearchCV, cross_val_score
+from sklearn.preprocessing import scale
+from sklearn.model_selection import RandomizedSearchCV
+
+
+X = df.drop('normalized_used_price', axis=1)
+y = df['normalized_used_price']
+
+# One-hot encoding on categorical variables
+X = pd.get_dummies(X)
+
+k = 5
+top_k_features = SelectKBest(score_func=mutual_info_regression, k=k).fit(X, y)
+X_new = top_k_features.transform(X)
+
+# Scaling the selected features
+X_new = MinMaxScaler().fit_transform(X_new)
+
+# Applying PCA
+n_components = 5  # Choose the number of components based on your needs
+X_pca = PCA(n_components=n_components).fit_transform(X_new)
+
+# Split the data
+train_full_X, val_X, train_full_y, val_y = train_test_split(X_pca, y, test_size=0.2, random_state=0)
+train_X, test_X, train_y, test_y = train_test_split(train_full_X, train_full_y, test_size=0.25, random_state=0)
+
+# Defining the Linear Regression model
+linear_model = LinearRegression()
+
+# Parameter grid for hyperparameter tuning
+
+param_grid = {
+    'fit_intercept': [True, False],
+    'copy_X': [True, False],
+    'n_jobs': [None, -1],  # Set to -1 for parallel processing
+    'positive': [True, False],  # Constrain the coefficients to be positive
+}
+
+# Perform Grid Search for hyperparameter tuning
+grid_search = GridSearchCV(linear_model, param_grid, cv=5, scoring='neg_mean_squared_error')
+grid_search.fit(train_X, train_y)
+
+# Get the best hyperparameters
+best_params = grid_search.best_params_
+
+# Get the best model
+best_model = grid_search.best_estimator_
+
+cross_val_results = cross_val_score(best_model, train_full_X, train_full_y, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
+
+# Make predictions on the test set
+preds = best_model.predict(test_X)
+
+# Evaluate the model
+r2 = r2_score(test_y, preds)
+MSE = mean_squared_error(test_y, preds)
+
+# Print results
+print("Linear Regression Model With top 5 features:")
+print(f"Best Parameters: {best_params}")
+print(f"Cross-Validation Results (MSE): {cross_val_results}")
+print(f"Mean CV MSE: {cross_val_results.mean():.4f}")
+print(f"R2: {round(r2, 4)}")
+print(f"MSE: {round(MSE, 4)}")
+
+#for all features in linear regression 
+
+X = df.drop('normalized_used_price', axis=1)
+y = df['normalized_used_price']
+
+X = pd.get_dummies(X)
+
+# Split the data
+train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.25, random_state=0)
+
+# Define the Linear Regression model
+linear_model = LinearRegression()
+
+# Define the parameter grid for hyperparameter tuning
+param_grid = {'fit_intercept': [True, False]}
+
+# Perform Grid Search for hyperparameter tuning
+grid_search = GridSearchCV(linear_model, param_grid, cv=5, scoring='neg_mean_squared_error')
+grid_search.fit(train_X, train_y)
+
+# Get the best hyperparameters
+best_params = grid_search.best_params_
+
+# Get the best model
+best_model = grid_search.best_estimator_
+
+# Make predictions on the test set
+preds = best_model.predict(test_X)
+
+# Evaluate the model
+r2 = r2_score(test_y, preds)
+MSE = mean_squared_error(test_y, preds)
+
+# Print results
+a = "Linear Regression with all features"
+print(a)
+print(f"Best Parameters: {best_params}")
+print(f"R2: {round(r2, 4)}")
+print(f"MSE: {round(MSE, 4)}")
+
+# Append the results to the list
+
+#top 5 features using the mlp regression
+
+X = df.drop('normalized_used_price', axis=1)
+y = df['normalized_used_price']
+
+# Perform one-hot encoding on categorical variables
+X = pd.get_dummies(X)
+
+# Feature selection using SelectKBest
+k = 5
+top_k_features = SelectKBest(score_func=mutual_info_regression, k=k).fit(X, y)
+X_new = top_k_features.transform(X)
+
+# Scale the selected features using MinMaxScaler
+X_new_scaled = MinMaxScaler().fit_transform(X_new)
+
+# Applying PCA
+n_components = 5  # Choose the number of components based on your needs
+X_pca = PCA(n_components=n_components).fit_transform(X_new_scaled)
+
+# Split the data
+train_full_X, val_X, train_full_y, val_y = train_test_split(X_pca, y, test_size=0.2, random_state=0)
+train_X, test_X, train_y, test_y = train_test_split(train_full_X, train_full_y, test_size=0.25, random_state=0)
+
+# Define the MLP Regressor model
+mlp_regressor = MLPRegressor()
+
+# Define the parameter grid for hyperparameter tuning
+param_grid = {
+    'hidden_layer_sizes': [(100,), (50, 50), (50, 30, 20)],
+    'activation': ['relu', 'tanh'],
+    'alpha': [0.0001, 0.001, 0.01],
+    'learning_rate': ['constant', 'invscaling', 'adaptive'],
+    
+}
+
+grid_search = GridSearchCV(mlp_regressor, param_grid, cv=5, scoring='neg_mean_squared_error')
+grid_search.fit(train_X, train_y)
+
+best_params = grid_search.best_params_
+
+best_model = grid_search.best_estimator_
+
+cross_val_results = cross_val_score(best_model, train_full_X, train_full_y, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
+
+# Make predictions on the test set
+preds = best_model.predict(test_X)
+
+# Evaluate the model
+r2 = r2_score(test_y, preds)
+MSE = mean_squared_error(test_y, preds)
+
+# Print results
+print("MLP Regressor Model With top 5 features:")
+print(f"Best Parameters: {best_params}")
+print(f"Cross-Validation Results (MSE): {cross_val_results}")
+print(f"Mean CV MSE: {cross_val_results.mean():.4f}") 
+print(f"R2: {round(r2, 4)}")
+print(f"MSE: {round(MSE, 4)}")
+
+X = df.drop('normalized_used_price', axis=1)
+y = df['normalized_used_price']
+
+# Split the data
+train_full_X, val_X, train_full_y, val_y = train_test_split(X_pca, y, test_size=0.2, random_state=0)
+train_X, test_X, train_y, test_y = train_test_split(train_full_X, train_full_y, test_size=0.25, random_state=0)
+
+# Define the MLP Regressor model
+mlp_regressor = MLPRegressor()
+
+# Define the parameter grid for hyperparameter tuning
+param_grid = {
+    'hidden_layer_sizes': [(100,), (50, 50), (50, 30, 20)],
+    'activation': ['relu', 'tanh'],
+    'alpha': [0.0001, 0.001, 0.01],
+    'learning_rate': ['constant', 'invscaling', 'adaptive'],
+    
+}
+
+# Perform Grid Search for hyperparameter tuning
+grid_search = GridSearchCV(mlp_regressor, param_grid, cv=5, scoring='neg_mean_squared_error')
+grid_search.fit(train_X, train_y)
+
+# Get the best hyperparameters
+best_params = grid_search.best_params_
+
+# Get the best model
+best_model = grid_search.best_estimator_
+
+cross_val_results = cross_val_score(best_model, train_full_X, train_full_y, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
+
+# Make predictions on the test set
+preds = best_model.predict(test_X)
+
+# Evaluate the model
+r2 = r2_score(test_y, preds)
+MSE = mean_squared_error(test_y, preds)
+
+# Print results
+print("MLP Regressor Model With All features:")
+print(f"Best Parameters: {best_params}")
+print(f"Cross-Validation Results (MSE): {cross_val_results}")
+print(f"Mean CV MSE: {cross_val_results.mean():.4f}") 
+print(f"R2: {round(r2, 4)}")
+print(f"MSE: {round(MSE, 4)}")
+
+
+X = df.drop('normalized_used_price', axis=1)
+y = df['normalized_used_price']
+
+# Perform one-hot encoding on categorical variables
+X = pd.get_dummies(X)
+
+# Feature selection using SelectKBest
+k = 5
+top_k_features = SelectKBest(score_func=mutual_info_regression, k=k).fit(X, y)
+X_new = top_k_features.transform(X)
+
+# Scale the selected features
+X_new = MinMaxScaler().fit_transform(X_new)
+
+# Applying PCA
+n_components = 5  # Choose the number of components based on your needs
+X_pca = PCA(n_components=n_components).fit_transform(X_new)
+
+# Split the data
+train_full_X, val_X, train_full_y, val_y = train_test_split(X_pca, y, test_size=0.2, random_state=0)
+train_X, test_X, train_y, test_y = train_test_split(train_full_X, train_full_y, test_size=0.25, random_state=0)
+
+# Define the Gradient Boosting Regressor model
+gradient_regressor = GradientBoostingRegressor()
+
+# Define the parameter grid for hyperparameter tuning
+param_grid = {
+    'n_estimators': [50, 100, 200],
+    'learning_rate': [0.01, 0.1, 0.2],
+    'max_depth': [3, 5, 7],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4],
+    'subsample': [0.8, 1.0],
+    'max_features': ['auto', 'sqrt', 'log2'],
+}
+
+# Perform Grid Search for hyperparameter tuning
+grid_search = GridSearchCV(gradient_regressor, param_grid, cv=5, scoring='neg_mean_squared_error')
+grid_search.fit(train_X, train_y)
+
+# Get the best hyperparameters
+best_params = grid_search.best_params_
+
+# Get the best model
+best_model = grid_search.best_estimator_
+
+gradient_cross_val_results = cross_val_score(best_model, train_full_X, train_full_y, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
+
+# Make predictions on the test set
+preds = best_model.predict(test_X)
+
+# Evaluate the model
+r2 = r2_score(test_y, preds)
+MSE = mean_squared_error(test_y, preds)
+
+# Print results
+print("Gradient Boosting Regressor Model With top 5 features:")
+print(f"Best Parameters: {best_params}")
+print(f"Cross-Validation Results (MSE): {gradient_cross_val_results}")
+print(f"Mean CV MSE: {gradient_cross_val_results.mean():.4f}")
+print(f"R2: {round(r2, 4)}")
+print(f"MSE: {round(MSE, 4)}")
+
+X = df.drop('normalized_used_price', axis=1)
+y = df['normalized_used_price']
+
+# Perform one-hot encoding on categorical variables
+X = pd.get_dummies(X)
+
+# Split the data
+train_full_X, val_X, train_full_y, val_y = train_test_split(X_pca, y, test_size=0.2, random_state=0)
+train_X, test_X, train_y, test_y = train_test_split(train_full_X, train_full_y, test_size=0.25, random_state=0)
+
+# Define the Gradient Boosting Regressor model
+gradient_regressor = GradientBoostingRegressor()
+
+# Define the parameter grid for hyperparameter tuning
+param_grid = {
+    'n_estimators': [50, 100, 200],
+    'learning_rate': [0.01, 0.1, 0.2],
+    'max_depth': [3, 5, 7],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4],
+    'subsample': [0.8, 1.0],
+    'max_features': ['auto', 'sqrt', 'log2'],
+}
+
+# Perform Grid Search for hyperparameter tuning
+grid_search = GridSearchCV(gradient_regressor, param_grid, cv=5, scoring='neg_mean_squared_error')
+grid_search.fit(train_X, train_y)
+
+# Get the best hyperparameters
+best_params = grid_search.best_params_
+
+# Get the best model
+best_model = grid_search.best_estimator_
+
+gradient_cross_val_results = cross_val_score(best_model, train_full_X, train_full_y, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
+
+# Make predictions on the test set
+preds = best_model.predict(test_X)
+
+# Evaluate the model
+r2 = r2_score(test_y, preds)
+MSE = mean_squared_error(test_y, preds)
+
+# Print results
+print("Gradient Boosting Regressor Model With All features:")
+print(f"Best Parameters: {best_params}")
+print(f"Cross-Validation Results (MSE): {gradient_cross_val_results}")
+print(f"Mean CV MSE: {gradient_cross_val_results.mean():.4f}")
+print(f"R2: {round(r2, 4)}")
+print(f"MSE: {round(MSE, 4)}")
+
+
+
+
+X= df.drop('normalized_used_price',axis=1)
+y= df.normalized_used_price
+
+# Perform one-hot encoding on categorical variables
+X = pd.get_dummies(X)
+
+# Feature selection using SelectKBest
+k = 5
+top_k_features = SelectKBest(score_func=mutual_info_regression, k=k).fit(X, y)
+X_new = top_k_features.transform(X)
+
+# Scale the selected features
+X_new = MinMaxScaler().fit_transform(X_new)
+
+# Apply PCA
+n_components = 5  # Assuming you want to keep 5 principal components
+pca = PCA(n_components=n_components)
+X_new = pca.fit_transform(X_new)
+
+start_time_pca = time.time()
+X_new = pca.fit_transform(X_new)
+end_time_pca = time.time()
+time_taken_pca = end_time_pca - start_time_pca
+
+# Split the data
+train_full_X, val_X, train_full_y, val_y = train_test_split(X_new, y, test_size=0.2, random_state=0)
+train_X, test_X, train_y, test_y = train_test_split(train_full_X, train_full_y, test_size=0.25, random_state=0)
+
+# Define the SVM regression model
+svm_model = SVR()
+
+# Define the parameter grid for hyperparameter tuning
+param_grid = {'C': [0.1, 1, 10], 
+              'kernel': ['linear', 'rbf', 'poly'], 
+              'epsilon': [0.1, 0.2, 0.3],
+              'shrinking': [True, False]
+}
+
+
+grid_search = GridSearchCV(svm_model, param_grid, cv=5, scoring='neg_mean_squared_error')
+grid_search.fit(train_X, train_y)
+
+# Get the best hyperparameters
+best_params = grid_search.best_params_
+
+# Get the best model
+best_model = grid_search.best_estimator_
+
+svm_cross_val_results = cross_val_score(best_model, train_full_X, train_full_y, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
+
+preds = best_model.predict(test_X)
+
+# Evaluate the model
+r2 = r2_score(test_y, preds)
+MSE = mean_squared_error(test_y, preds)
+
+# Print results
+print("SVM Regression Model With 5 Features:")
+print(f"Best Parameters: {best_params}")
+print(f"Cross-Validation Results (MSE): {svm_cross_val_results}")
+print(f"Mean CV MSE: {svm_cross_val_results.mean():.4f}")
+print(f"R2: {round(r2, 4)}")
+print(f"MSE: {round(MSE, 4)}")
+
+
+X = df.drop('normalized_used_price', axis=1)
+y = df['normalized_used_price']
+
+
+# Split the data
+train_full_X, val_X, train_full_y, val_y = train_test_split(X_new, y, test_size=0.2, random_state=0)
+train_X, test_X, train_y, test_y = train_test_split(train_full_X, train_full_y, test_size=0.25, random_state=0)
+
+# Define the SVM regression model
+svm_model = SVR()
+
+# Define the parameter grid for hyperparameter tuning
+param_grid = {'C': [0.1, 1, 10], 
+              'kernel': ['linear', 'rbf', 'poly'], 
+              'epsilon': [0.1, 0.2, 0.3],
+              'shrinking': [True, False]
+}
+
+
+# Perform Grid Search for hyperparameter tuning
+grid_search = GridSearchCV(svm_model, param_grid, cv=5, scoring='neg_mean_squared_error')
+grid_search.fit(train_X, train_y)
+
+# Get the best hyperparameters
+best_params = grid_search.best_params_
+
+# Get the best model
+best_model = grid_search.best_estimator_
+
+# Get the best model
+best_model = grid_search.best_estimator_
+
+svm_cross_val_results = cross_val_score(best_model, train_full_X, train_full_y, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
+
+
+# Make predictions on the test set
+preds = best_model.predict(test_X)
+
+# Evaluate the model
+r2 = r2_score(test_y, preds)
+MSE = mean_squared_error(test_y, preds)
+
+# Print results
+a = "SVM Regression Model with all features"
+print(a)
+print(f"Best Parameters: {best_params}")
+print(f"Cross-Validation Results (MSE): {svm_cross_val_results}")
+print(f"Mean CV MSE: {svm_cross_val_results.mean():.4f}")
+print(f"R2: {round(r2, 4)}")
+print(f"MSE: {round(MSE, 4)}")
+
+
+
+
+
+X = df.drop('normalized_used_price', axis=1)
+y = df['normalized_used_price']
+
+# Perform one-hot encoding on categorical variables
+X = pd.get_dummies(X)
+
+# Feature selection using SelectKBest
+k = 5
+top_k_features = SelectKBest(score_func=mutual_info_regression, k=k).fit(X, y)
+X_new = top_k_features.transform(X)
+
+# Scale the selected features
+X_new = MinMaxScaler().fit_transform(X_new)
+
+# Applying PCA
+n_components = 5  # Choose the number of components based on your needs
+X_pca = PCA(n_components=n_components).fit_transform(X_new)
+
+# Split the data
+train_full_X, val_X, train_full_y, val_y = train_test_split(X_pca, y, test_size=0.2, random_state=0)
+train_X, test_X, train_y, test_y = train_test_split(train_full_X, train_full_y, test_size=0.25, random_state=0)
+
+# Define the Random Forest Regressor model
+random_forest = RandomForestRegressor()
+
+# Define the parameter grid for hyperparameter tuning
+param_grid = {
+    'ccp_alpha': [0.0, 0.1],
+    'max_depth': [None, 10, 20],
+    'max_features': ['auto', 'sqrt'],
+    'max_leaf_nodes': [None, 50, 100],
+    'max_samples': [None, 0.5],
+    'min_impurity_decrease': [0.0, 0.2],
+    'min_samples_leaf': [1, 2],
+    'min_samples_split': [2, 5],
+    'min_weight_fraction_leaf': [0.0, 0.1],
+    'oob_score': [False, True],
+    'warm_start': [False, True]
+}
+
+# Perform Grid Search for hyperparameter tuning
+grid_search = GridSearchCV(random_forest, param_grid, cv=5, scoring='neg_mean_squared_error')
+grid_search.fit(train_X, train_y)
+
+# Get the best hyperparameters
+best_params = grid_search.best_params_
+
+# Get the best model
+best_model = grid_search.best_estimator_
+
+# Evaluate the model using cross-validation
+random_forest_cross_val_results = cross_val_score(best_model, train_full_X, train_full_y, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
+
+# Make predictions on the test set
+preds = best_model.predict(test_X)
+
+# Evaluate the model
+r2 = r2_score(test_y, preds)
+MSE = mean_squared_error(test_y, preds)
+
+# Print results
+print("Random Forest Regressor Model With top 5 features:")
+print(f"Best Parameters: {best_params}")
+print(f"Cross-Validation Results (MSE): {random_forest_cross_val_results}")
+print(f"Mean CV MSE: {random_forest_cross_val_results.mean():.4f}")
+print(f"R2: {round(r2, 5)}")
+print(f"MSE: {round(MSE, 5)}")
+
+X = df.drop('normalized_used_price', axis=1)
+y = df['normalized_used_price']
+
+# Split the data
+train_full_X, val_X, train_full_y, val_y = train_test_split(X_pca, y, test_size=0.2, random_state=0)
+train_X, test_X, train_y, test_y = train_test_split(train_full_X, train_full_y, test_size=0.25, random_state=0)
+
+# Define the Random Forest Regressor model
+random_forest = RandomForestRegressor()
+
+# Define the parameter grid for hyperparameter tuning
+param_grid = {
+    'ccp_alpha': [0.0, 0.1],
+    'max_depth': [None, 10, 20],
+    'max_features': ['auto', 'sqrt'],
+    'max_leaf_nodes': [None, 50, 100],
+    'max_samples': [None, 0.5],
+    'min_impurity_decrease': [0.0, 0.2],
+    'min_samples_leaf': [1, 2],
+    'min_samples_split': [2, 5],
+    'min_weight_fraction_leaf': [0.0, 0.1],
+    'oob_score': [False, True],
+    'warm_start': [False, True]
+}
+
+# Perform Grid Search for hyperparameter tuning
+grid_search = GridSearchCV(random_forest, param_grid, cv=5, scoring='neg_mean_squared_error')
+grid_search.fit(train_X, train_y)
+
+# Get the best hyperparameters
+best_params = grid_search.best_params_
+
+# Get the best model
+best_model = grid_search.best_estimator_
+
+# Evaluate the model using cross-validation
+random_forest_cross_val_results = cross_val_score(best_model, train_full_X, train_full_y, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
+
+# Make predictions on the test set
+preds = best_model.predict(test_X)
+
+# Evaluate the model
+r2 = r2_score(test_y, preds)
+MSE = mean_squared_error(test_y, preds)
+
+# Print results
+print("Random Forest Regressor Model With All features:")
+print(f"Best Parameters: {best_params}")
+print(f"Cross-Validation Results (MSE): {random_forest_cross_val_results}")
+print(f"Mean CV MSE: {random_forest_cross_val_results.mean():.4f}")
+print(f"R2: {round(r2, 5)}")
+print(f"MSE: {round(MSE, 5)}")
+
+#learning curves
+from sklearn.model_selection import learning_curve
+
+def plot_learning_curve(estimator, X, y, train_sizes, cv, scoring, title):
+    train_sizes, train_scores, validation_scores = learning_curve(
+        estimator, X, y, train_sizes=train_sizes, cv=cv, scoring=scoring, n_jobs=-1
+    )
+
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    validation_scores_mean = np.mean(validation_scores, axis=1)
+    validation_scores_std = np.std(validation_scores, axis=1)
+
+    plt.figure(figsize=(10, 6))
+    plt.fill_between(
+        train_sizes,
+        train_scores_mean - train_scores_std,
+        train_scores_mean + train_scores_std,
+        alpha=0.1,
+        color="r",
+    )
+    plt.fill_between(
+        train_sizes,
+        validation_scores_mean - validation_scores_std,
+        validation_scores_mean + validation_scores_std,
+        alpha=0.1,
+        color="g",
+    )
+    plt.plot(
+        train_sizes,
+        train_scores_mean,
+        'o-',
+        color="r",
+        label="Training score"
+    )
+    plt.plot(
+        train_sizes,
+        validation_scores_mean,
+        'o-',
+        color="g",
+        label="Cross-validation score"
+    )
+
+    plt.title(title)
+    plt.xlabel("Training Data")
+    plt.ylabel(scoring)
+    plt.legend(loc="best")
+    plt.grid(True)
+    plt.show()
+
+# Linear Regression
+linear_regression = LinearRegression()
+linear_regression.fit(train_full_X, train_full_y)
+
+# MLP Regressor
+mlp_regressor = MLPRegressor()
+mlp_regressor.fit(train_full_X, train_full_y)
+
+gradient_model = GradientBoostingRegressor()
+gradient_model.fit(train_full_X, train_full_y)
+
+# Random Forest Regressor
+random_forest = RandomForestRegressor()
+random_forest.fit(train_full_X, train_full_y)
+
+# SVM Regressor
+svm_model = SVR()
+svm_model.fit(train_full_X, train_full_y)
+
+# Define the models and their titles
+models = [linear_regression, gradient_model,random_forest, svm_model, mlp_regressor]
+titles = ["Linear Regression", "Gradient Boosting Regressor", "Random Forest Regressor", "Support Vector Machine (SVM) Regressor", "MLP Regressor"]
+
+# Plot learning curves for each model
+for model, title in zip(models, titles):
+    plot_learning_curve(model, train_full_X, train_full_y, train_sizes=[50, 100, 200, 500, 1000],  cv=5, scoring='neg_mean_squared_error', title=title)
+
+
+
+def plot_actual_vs_predicted(model, X_test, y_test, title):
+    # Predict on the test set
+    predictions = model.predict(X_test)
+
+    # Scatter plot of actual vs. predicted values with different colors
+    plt.figure(figsize=(8, 8))
+    plt.scatter(y_test, predictions, alpha=0.5, label='Predicted', color='blue')
+    plt.scatter(y_test, y_test, alpha=0.5, label='Actual', color='red')  # Adding a second scatter plot for actual vs. actual values
+    plt.title(f'{title}: Actual vs. Predicted Values')
+    plt.xlabel('Actual Values')
+    plt.ylabel('Predicted Values')
+    plt.legend()
+    plt.show()
+
+# Linear Regression
+linear_regression = LinearRegression()
+linear_regression.fit(train_full_X, train_full_y)
+plot_actual_vs_predicted(linear_regression, test_X, test_y, 'Linear Regression')
+
+# MLP Regressor
+mlp_regressor = MLPRegressor()
+mlp_regressor.fit(train_full_X, train_full_y)
+plot_actual_vs_predicted(mlp_regressor, test_X, test_y, 'MLP Regressor')
+
+# Gradient Boosting Regressor
+gradient_model = GradientBoostingRegressor()
+gradient_model.fit(train_full_X, train_full_y)
+plot_actual_vs_predicted(gradient_model, test_X, test_y, 'Gradient Boosting Regressor')
+
+# Random Forest Regressor
+random_forest = RandomForestRegressor()
+random_forest.fit(train_full_X, train_full_y)
+plot_actual_vs_predicted(random_forest, test_X, test_y, 'Random Forest Regressor')
+
+# Support Vector Machine (SVM) Regressor
+svm_model = SVR()
+svm_model.fit(train_full_X, train_full_y)
+plot_actual_vs_predicted(svm_model, test_X, test_y, 'SVM Regressor')
